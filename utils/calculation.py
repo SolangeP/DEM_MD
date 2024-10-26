@@ -1,21 +1,23 @@
-'''
+"""
 File with calculus functions
-'''
+"""
+
 from itertools import permutations
 import numpy as np
 import scipy.spatial as sp
 
 ############# Methods for covariance computations
 
+
 def _estimate_gaussian_covariances_full(tau, x, nk, means, reg_covar):
-    '''
+    """
     Compute covariance parameters in multivariate Gaussian distributions
 
     Parameters
     ----------
     tau : see Notations.md
-    x : see Notations
-    nk: 
+    x : see Notations.md
+    nk: Sum of responsibilities for each component (over samples)
     means : see Notations.md
     reg_covar : float
         value to regularize covariance matrices
@@ -25,16 +27,17 @@ def _estimate_gaussian_covariances_full(tau, x, nk, means, reg_covar):
     covariances : array, shape (n_components, n_features, n_features)
         The scale matrices of the current components.
 
-    '''
+    """
     n_components, n_features = means.shape
     covariances = np.empty((n_components, n_features, n_features))
 
     for k in range(n_components):
         diff = x - means[k]
         covariances[k] = np.dot(tau[k, :] * diff.T, diff) / nk[k]
-        covariances[k].flat[::n_features + 1] += reg_covar
+        covariances[k].flat[:: n_features + 1] += reg_covar
 
     return covariances
+
 
 def _estimate_student_covariances_full(tau, gamma_u, x, means, reg_covar):
     """Compute covariance parameters in multivariate Student distributions
@@ -60,22 +63,22 @@ def _estimate_student_covariances_full(tau, gamma_u, x, means, reg_covar):
 
     for k in range(n_components):
         diff = x - means[k]
-        covariances[k] = (
-            np.dot(tau[k, :] * gamma_u[k, :] * diff.T, diff) / (tau[k, :]).sum()
-        )  
+        covariances[k] = np.dot(tau[k, :] * gamma_u[k, :] * diff.T, diff) / (tau[k, :]).sum()
         covariances[k].flat[:: n_features + 1] += reg_covar
 
     return covariances
 
+
 ############# Methods for permutations and errors on parameters
 
-def compute_min_permut(est_means,true_means):
+
+def compute_min_permut(est_means, true_means):
     """Find optimal matching between estimated and true classes, based on location parameters.
 
     Parameters
     ----------
     est_means : array-like, (n_components, n_features)
-        Array with estimated location parameters 
+        Array with estimated location parameters
     true_means : array-like, (n_components, n_features)
         Array with true location parameters
 
@@ -87,18 +90,18 @@ def compute_min_permut(est_means,true_means):
 
     true_k = true_means.shape[0]
 
-    dist_matrix = sp.distance_matrix(true_means,est_means)
+    dist_matrix = sp.distance_matrix(true_means, est_means)
 
-    l = list(permutations(np.arange(0,true_k)))
+    l = list(permutations(np.arange(0, true_k)))
     min_val = np.inf
     min_permutation = l[0]
 
     for permut in l:
         val = []
         for k in range(true_k):
-            val.append(dist_matrix[k,permut[k]])
+            val.append(dist_matrix[k, permut[k]])
 
-        if 	sum(val) <= min_val:
+        if sum(val) <= min_val:
             min_val = sum(val)
             min_permutation = permut
         del val
@@ -106,8 +109,9 @@ def compute_min_permut(est_means,true_means):
     min_permutation = list(min_permutation)
     return min_permutation
 
-def swap_labels(est_means,labels,dico_cont_params,permut):
-    """Swap labels in estimated_labels vect 
+
+def swap_labels(est_means, labels, dico_cont_params, permut):
+    """Swap labels in estimated_labels vect
     to match classes with the true mixture model
 
     Parameters
@@ -126,16 +130,16 @@ def swap_labels(est_means,labels,dico_cont_params,permut):
     list
         Permuted estimated labels to match estimated classes with true ones
     """
-    
+
     est_k = est_means.shape[0]
 
-    true_k = len(dico_cont_params['proportions'])
+    true_k = len(dico_cont_params["proportions"])
 
-    permut_labels = np.zeros(labels.shape,dtype=int)
+    permut_labels = np.zeros(labels.shape, dtype=int)
 
     if est_k == true_k:
         for j in range(true_k):
-            mask = labels==permut[j]
+            mask = labels == permut[j]
             permut_labels[mask] = j
 
     else:
@@ -143,7 +147,7 @@ def swap_labels(est_means,labels,dico_cont_params,permut):
     return permut_labels
 
 
-def errors_proportions(est_pi,true_pi,permutation):
+def errors_proportions(est_pi, true_pi, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -159,13 +163,15 @@ def errors_proportions(est_pi,true_pi,permutation):
     -------
     array-like, (n_components, )
         relative errors for each class
-    """    
+    """
     true_k = len(true_pi)
 
-    return np.array([np.abs(est_pi[permutation[k]] - true_pi[k])/np.abs(true_pi[k]) for k in range(true_k)])
+    return np.array(
+        [np.abs(est_pi[permutation[k]] - true_pi[k]) / np.abs(true_pi[k]) for k in range(true_k)]
+    )
 
 
-def errors_locations(est_means,true_means,permutation):
+def errors_locations(est_means, true_means, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -184,11 +190,14 @@ def errors_locations(est_means,true_means,permutation):
     """
     true_k = true_means.shape[0]
 
-
-    errors_means = [np.linalg.norm(est_means[permutation[k]]-true_means[k])/np.linalg.norm(true_means[k]) for k in range(true_k)]
+    errors_means = [
+        np.linalg.norm(est_means[permutation[k]] - true_means[k]) / np.linalg.norm(true_means[k])
+        for k in range(true_k)
+    ]
     return np.array(errors_means)
 
-def errors_scales(est_cov,true_cov,permutation):
+
+def errors_scales(est_cov, true_cov, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -204,15 +213,19 @@ def errors_scales(est_cov,true_cov,permutation):
     -------
     array-like, (n_components,)
         relative errors for each class
-    """    
+    """
 
     true_k = true_cov.shape[0]
 
-    Frob_norm = [np.linalg.norm(est_cov[permutation[j]]- true_cov[j])/np.linalg.norm(true_cov[j]) for j in range(true_k)]
+    Frob_norm = [
+        np.linalg.norm(est_cov[permutation[j]] - true_cov[j]) / np.linalg.norm(true_cov[j])
+        for j in range(true_k)
+    ]
 
     return np.array(Frob_norm)
 
-def errors_dofs(est_dof,true_dof,permutation):
+
+def errors_dofs(est_dof, true_dof, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -228,12 +241,15 @@ def errors_dofs(est_dof,true_dof,permutation):
     -------
     array-like, (n_components, )
         relative errors for each class
-    """    
+    """
     true_k = len(true_dof)
 
-    return np.array([np.abs(true_dof[k]-est_dof[permutation[k]])/np.abs(true_dof[k]) for k in range(true_k)])
+    return np.array(
+        [np.abs(true_dof[k] - est_dof[permutation[k]]) / np.abs(true_dof[k]) for k in range(true_k)]
+    )
 
-def errors_skeweness(est_alpha,true_alpha,permutation):
+
+def errors_skeweness(est_alpha, true_alpha, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -249,14 +265,20 @@ def errors_skeweness(est_alpha,true_alpha,permutation):
     -------
     array-like, (n_components, )
         relative errors for each class
-    """    
+    """
 
     true_k = true_alpha.shape[0]
-        
-    return np.array([np.linalg.norm(true_alpha[k]-est_alpha[permutation[k]],2)/np.linalg.norm(true_alpha[k]) for k in range(true_k)])
+
+    return np.array(
+        [
+            np.linalg.norm(true_alpha[k] - est_alpha[permutation[k]], 2)
+            / np.linalg.norm(true_alpha[k])
+            for k in range(true_k)
+        ]
+    )
 
 
-def errors_bernoulli(est_ber,true_ber,permutation):
+def errors_bernoulli(est_ber, true_ber, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -272,12 +294,15 @@ def errors_bernoulli(est_ber,true_ber,permutation):
     -------
     array-like, (n_components, )
         relative errors for each class
-    """    
+    """
     true_k = len(true_ber)
 
-    return np.array([np.abs(est_ber[permutation[k]] - true_ber[k])/np.abs(true_ber[k]) for k in range(true_k)])
+    return np.array(
+        [np.abs(est_ber[permutation[k]] - true_ber[k]) / np.abs(true_ber[k]) for k in range(true_k)]
+    )
 
-def errors_poisson(est_poisson,true_poisson,permutation):
+
+def errors_poisson(est_poisson, true_poisson, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -293,13 +318,18 @@ def errors_poisson(est_poisson,true_poisson,permutation):
     -------
     array-like, (n_components, )
         _description_
-    """    
+    """
     true_k = len(true_poisson)
 
-    return np.array([np.abs(est_poisson[permutation[k]] - true_poisson[k])/np.abs(true_poisson[k]) for k in range(true_k)])
+    return np.array(
+        [
+            np.abs(est_poisson[permutation[k]] - true_poisson[k]) / np.abs(true_poisson[k])
+            for k in range(true_k)
+        ]
+    )
 
 
-def errors_multi(est_multi,true_multi,permutation):
+def errors_multi(est_multi, true_multi, permutation):
     """Compute relative errors of estimated parameters.
 
     Parameters
@@ -315,7 +345,13 @@ def errors_multi(est_multi,true_multi,permutation):
     -------
     array-like, shape (n_components,)
         relative errors for each class
-    """    
+    """
     true_k = true_multi.shape[0]
 
-    return np.array([np.linalg.norm(est_multi[permutation[k]]-true_multi[k],ord=1)/np.linalg.norm(true_multi[k],ord=1) for k in range(true_k)])
+    return np.array(
+        [
+            np.linalg.norm(est_multi[permutation[k]] - true_multi[k], ord=1)
+            / np.linalg.norm(true_multi[k], ord=1)
+            for k in range(true_k)
+        ]
+    )

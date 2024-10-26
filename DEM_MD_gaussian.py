@@ -41,8 +41,8 @@ def estimate_gaussian_log_proba(x, locations, scales, proportions):
                 + n_features * np.log(2 * np.pi)
             ) + np.log(proportions[i])
 
-        except np.linalg.LinAlgError: 
-            print('Error with a covariance matrix')
+        except np.linalg.LinAlgError:
+            print("Error with a covariance matrix")
             print(scales[i])
             break
 
@@ -69,8 +69,8 @@ class GaussianDEMMD(BaseDEMMD):
             is_dummy=is_dummy,
             type_discrete_features=type_discrete_features,
             index_discrete_features=index_discrete_features,
-        )        
-        self.gamma = gamma 
+        )
+        self.gamma = gamma
         self.minimal_iteration_number = 100
         self.beta = 1.0
         self.n_iter = 0
@@ -93,7 +93,8 @@ class GaussianDEMMD(BaseDEMMD):
 
         Parameters
         ----------
-        x : see NOTATIONS.md
+        x_cont : see Notations.md
+        x_discr: see Notations.md
         """
 
         n_samples, _ = x_cont.shape
@@ -147,8 +148,8 @@ class GaussianDEMMD(BaseDEMMD):
 
         return estimate_gaussian_log_proba(x_cont, self.means, self.covariances, self.proportions)
 
-    def _estimate_params(self, x, log_tau):
-        """Compute estimates of covariance matrix parameters. 
+    def _estimate_cov_matrices(self, x, log_tau):
+        """Compute estimates of covariance matrix parameters.
 
         Parameters
         ----------
@@ -188,9 +189,8 @@ class GaussianDEMMD(BaseDEMMD):
         ------
         ValueError
             If clusters annihilation lead to keep 1 or zero clusters
-        """        
-        
-        
+        """
+
         #############################################
         # Split of continuously and discretly distributed features
         x_cont, x_discr = self.transform_data(x)
@@ -206,7 +206,9 @@ class GaussianDEMMD(BaseDEMMD):
         proportions = np.zeros((self.n_components,))
         e_value = np.sum(np.multiply(self.prev_pi, np.log(self.prev_pi)))
         for k in range(self.n_components):
-            proportions[k] = proportions_em[k] + self.beta * self.prev_pi[k] * (np.log(self.prev_pi[k]) - e_value)
+            proportions[k] = proportions_em[k] + self.beta * self.prev_pi[k] * (
+                np.log(self.prev_pi[k]) - e_value
+            )
         proportions = proportions / np.sum(proportions)
         self.proportions = copy.deepcopy(proportions)
         ##########################
@@ -214,7 +216,10 @@ class GaussianDEMMD(BaseDEMMD):
         ########################
         # Update beta parameter
         eta = np.amin([1.0, 0.5 ** (np.floor(n_features / 2.0 - 1.0))])
-        left = np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_pi))) / self.n_components
+        left = (
+            np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_pi)))
+            / self.n_components
+        )
 
         max_proportions_em = np.amax(proportions_em)
         max_pi_old = np.amax(self.prev_pi)
@@ -256,7 +261,7 @@ class GaussianDEMMD(BaseDEMMD):
         ###############################################################
 
         ##################################################################################
-        # Check for a pathological solution corresponding to superimposed clusters 
+        # Check for a pathological solution corresponding to superimposed clusters
         # Desactivate the proportions regularisation after a certain number of iterations.
         if (iteration >= self.minimal_iteration_number) and (
             (self.history.n_components[iteration - 100] == self.n_components)
@@ -281,7 +286,7 @@ class GaussianDEMMD(BaseDEMMD):
 
         ############################
         # Update covariance matrices
-        cov_reg = self._estimate_params(x_cont, log_tau)
+        cov_reg = self._estimate_cov_matrices(x_cont, log_tau)
         self.covariances = copy.deepcopy(cov_reg)
 
     def fit_predict(self, x):
@@ -312,7 +317,7 @@ class GaussianDEMMD(BaseDEMMD):
         ll = log_prob_norm
         self.history.save_variables(ll, "log_likelihood")
 
-        tau = copy.deepcopy(np.exp(log_tau))  
+        tau = copy.deepcopy(np.exp(log_tau))
         nk = tau.sum(axis=1) + 10 * np.finfo(tau.dtype).eps
 
         self.converged_ = False

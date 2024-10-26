@@ -6,7 +6,7 @@ from base_DEM_MD import BaseDEMMD
 
 
 def estimate_sal_log_proba(x, locations, scales, alphas, proportions):
-    """ 
+    """
     Estimate the log SAL probability.
 
     Parameters
@@ -28,7 +28,7 @@ def estimate_sal_log_proba(x, locations, scales, alphas, proportions):
 
     nu = (2.0 - n_features) / 2.0
 
-    for k, (mu, scale, alph, proportions) in enumerate(zip(locations, scales, alphas, proportions)):
+    for k, (mu, scale, alph, prop_k) in enumerate(zip(locations, scales, alphas, proportions)):
         precision = np.linalg.inv(scale)
         alph_mat = alph.reshape(-1, 1)
         log_det = np.log(np.linalg.det(scale))
@@ -58,12 +58,12 @@ def estimate_sal_log_proba(x, locations, scales, alphas, proportions):
         else:
             t3 = 0.0
 
-        log_prob[k, :] = t1 + t2 + t3 + log_bessel + np.log(proportions)
+        log_prob[k, :] = t1 + t2 + t3 + log_bessel + np.log(prop_k)
 
     return log_prob
 
 
-def estimate_means(log_tau, e1, e2, x):
+def estimate_locations(log_tau, e1, e2, x):
     """Estimation of locations parameters for Shifted Asymmetric Laplace distributions in a mixture model.
 
     Parameters
@@ -164,11 +164,14 @@ def estimate_scales(log_tau, e1, e2, locations, alphas, x_cont):
         alph_mat = alph.reshape(-1, 1)
         tau_e1 = tau_k.dot(e1[k, :]) / n_cluster
 
-        scales[k] = s_mat - alph_mat.dot(r.T) - r.dot(alph_mat.T) + alph_mat.dot(alph_mat.T) * tau_e1
+        scales[k] = (
+            s_mat - alph_mat.dot(r.T) - r.dot(alph_mat.T) + alph_mat.dot(alph_mat.T) * tau_e1
+        )
 
     return scales
 
-def scheme_temperature(t,b,rb):
+
+def scheme_temperature(t, b, rb):
     """Temperature scheme used for annealing on posterior probabilities during E step of estimation process.
 
     Parameters
@@ -183,7 +186,7 @@ def scheme_temperature(t,b,rb):
     float
         the temperature value applied during E step
     """
-    return 1. + b*np.sin(t/rb)/(t/rb)
+    return 1.0 + b * np.sin(t / rb) / (t / rb)
 
 
 class SALDEMMD(BaseDEMMD):
@@ -200,8 +203,8 @@ class SALDEMMD(BaseDEMMD):
         index_discrete_features=[np.array([2])],
         is_dummy=False,
         use_temperature=True,
-        temp_b=1.,
-        temp_rb=3.,
+        temp_b=1.0,
+        temp_rb=3.0,
     ):
         super().__init__(
             eps=eps,
@@ -222,7 +225,7 @@ class SALDEMMD(BaseDEMMD):
         self.beta = 1.0
         self.converged_ = False
         self._on_init()
-        
+
     def _on_init(self):
         self.means = None
         self.prev_means = None
@@ -246,9 +249,7 @@ class SALDEMMD(BaseDEMMD):
         n_samples, n_features = x_cont.shape
         self.n_components = n_samples
 
-        means = np.copy(x_cont) + self.random_state.normal(
-            0, np.std(x_cont) * 10e-2, x_cont.shape
-        )
+        means = np.copy(x_cont) + self.random_state.normal(0, np.std(x_cont) * 10e-2, x_cont.shape)
         proportions = np.repeat(1.0 / n_samples, n_samples)
         covariances = self._initialize_covariances(x_cont)
         alphas = np.zeros((self.n_components, n_features))
@@ -258,7 +259,6 @@ class SALDEMMD(BaseDEMMD):
             p_discrete = self._initialize_pdiscrete(x_discr)
         else:
             p_discrete = []
-
 
         self.proportions = np.copy(proportions, order="F")
         self.means = np.copy(means, order="F")
@@ -287,7 +287,7 @@ class SALDEMMD(BaseDEMMD):
         Parameters
         ----------
         x : see Notations.md
-        
+
         Returns
         -------
         weighted_log_prob : array, shape (n_component,n_samples)
@@ -300,7 +300,9 @@ class SALDEMMD(BaseDEMMD):
                 x_cont, self.means, self.covariances, self.alphas, self.proportions
             ) + self._estimate_discrete_log_prob(x_discr)
         # else:
-        return estimate_sal_log_proba(x_cont, self.means, self.covariances, self.alphas, self.proportions)
+        return estimate_sal_log_proba(
+            x_cont, self.means, self.covariances, self.alphas, self.proportions
+        )
 
     def _estimate_e1_e2(self, x):
         """Estimate  expected values of latent variables W and W^-1.
@@ -330,9 +332,7 @@ class SALDEMMD(BaseDEMMD):
             precision = np.linalg.inv(scale)
             xc = x - mu
             a[k] = 2 + (alph_mat.T.dot(precision)).dot(alph_mat)
-            b[k, :] = np.sum(
-                np.multiply((xc.dot(precision)), xc), axis=1
-            )
+            b[k, :] = np.sum(np.multiply((xc.dot(precision)), xc), axis=1)
 
             log_b = np.log(b[k, :])
             log_a = np.log(a[k])
@@ -350,7 +350,7 @@ class SALDEMMD(BaseDEMMD):
             e2[k, np.isnan(e2[k, :])] = np.inf
         return e1, e2
 
-    def _estimate_log_tau(self, x):
+    def _estimate_log_tau(self, x):  # FIX why this name ?
         """
         Estimate log probabilities and responsibilities for each sample.
         Compute the log probabilities, weighted log probabilities per
@@ -373,7 +373,9 @@ class SALDEMMD(BaseDEMMD):
         e1, e2 = self._estimate_e1_e2(x_cont)
 
         if self.use_temp:
-            self.temperature = scheme_temperature(self.iteration_temp, b=self.temp_b, rb=self.temp_rb)
+            self.temperature = scheme_temperature(
+                self.iteration_temp, b=self.temp_b, rb=self.temp_rb
+            )
             weighted_log_prob = self._estimate_weighted_log_prob(x) * (1.0 / self.temperature)
         else:
             weighted_log_prob = self._estimate_weighted_log_prob(x)
@@ -382,7 +384,7 @@ class SALDEMMD(BaseDEMMD):
 
         return log_prob_norm, weighted_log_prob - log_prob_norm[np.newaxis, :], e1, e2
 
-    def _estimate_params(self, x, log_tau, e1, e2, cov_comput='original'):
+    def _estimate_cov_matrices(self, x, log_tau, e1, e2, cov_comput="original"):
         """_summary_
 
         Parameters
@@ -405,9 +407,7 @@ class SALDEMMD(BaseDEMMD):
         cov_reg = np.empty((self.n_components, n_features, n_features))
 
         if cov_comput == "original":
-            covariances = estimate_scales(
-                log_tau, e1, e2, self.means, self.alphas, x
-            )
+            covariances = estimate_scales(log_tau, e1, e2, self.means, self.alphas, x)
             q_matrix = self.min_dist * np.eye(n_features)
             cov_reg = (1.0 - self.gamma) * covariances + self.gamma * q_matrix
 
@@ -425,7 +425,9 @@ class SALDEMMD(BaseDEMMD):
             emp_cov = np.dot(diff_emp.T, diff_emp) / len(x)
             w_const = n_features + 2
             a0 = 0.001
-            w_mat = (a0) ** (1.0 / n_features) * emp_cov / np.linalg.det(emp_cov) ** (1.0 / n_features)
+            w_mat = (
+                (a0) ** (1.0 / n_features) * emp_cov / np.linalg.det(emp_cov) ** (1.0 / n_features)
+            )
             cov_reg = self._estimate_scales_reg(log_tau, e1, e2, x, w_mat, w_const)
         return cov_reg
 
@@ -446,7 +448,7 @@ class SALDEMMD(BaseDEMMD):
         Returns
         -------
         new_scales
-            estimated scale matrices 
+            estimated scale matrices
         """
         _, n_features = x.shape
         tau = np.exp(log_tau)
@@ -456,15 +458,17 @@ class SALDEMMD(BaseDEMMD):
 
         for k, (mu, alph) in enumerate(zip(self.means, self.alphas)):
             tau_k = tau[k, :]
-            n_cluster = np.sum(tau_k)  
-            xc = x - mu  
-            r = np.dot(tau_k, xc)  
-            r = r.reshape(-1, 1)  
+            n_cluster = np.sum(tau_k)
+            xc = x - mu
+            r = np.dot(tau_k, xc)
+            r = r.reshape(-1, 1)
             s_mat = np.dot(tau_k * e2[k, :] * xc.T, xc)
             alph_mat = alph.reshape(-1, 1)
             tau_e1 = tau_k.dot(e1[k, :])
 
-            scales[k] = s_mat - alph_mat.dot(r.T) - r.dot(alph_mat.T) + alph_mat.dot(alph_mat.T) * tau_e1
+            scales[k] = (
+                s_mat - alph_mat.dot(r.T) - r.dot(alph_mat.T) + alph_mat.dot(alph_mat.T) * tau_e1
+            )
             new_scales[k] = copy.deepcopy(scales[k])
             new_scales[k] = (new_scales[k] + w_mat) / (n_cluster + w_const + n_features + 1)
 
@@ -503,8 +507,8 @@ class SALDEMMD(BaseDEMMD):
         ------
         ValueError
             If clusters annihilation leads to keep 1 or zero clusters
-        """        
-        
+        """
+
         #############################################
         # Split of continuously and discretly distributed features
         x_cont, x_discr = self.transform_data(x)
@@ -522,7 +526,9 @@ class SALDEMMD(BaseDEMMD):
         e_value = np.sum(np.multiply(self.prev_proportions, np.log(self.prev_proportions)))
 
         for k in range(self.n_components):
-            proportions[k] = proportions_em[k] + self.beta * self.prev_proportions[k] * (np.log(self.prev_proportions[k]) - e_value)
+            proportions[k] = proportions_em[k] + self.beta * self.prev_proportions[k] * (
+                np.log(self.prev_proportions[k]) - e_value
+            )
         proportions = proportions / np.sum(proportions)
         self.proportions = copy.deepcopy(proportions)
         ##########################
@@ -531,7 +537,8 @@ class SALDEMMD(BaseDEMMD):
         # Update beta parameter
         eta = np.amin([1.0, 0.5 ** (np.floor(n_features / 2.0 - 1.0))])
         left = (
-            np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_proportions))) / self.n_components
+            np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_proportions)))
+            / self.n_components
         )
 
         max_proportions_em = np.amax(proportions_em)
@@ -579,7 +586,7 @@ class SALDEMMD(BaseDEMMD):
         ###############################################
 
         ##################################################################################
-        # Check for a pathological solution corresponding to superimposed clusters 
+        # Check for a pathological solution corresponding to superimposed clusters
         # Desactivate the proportions regularisation after a certain number of iterations.
         if (iteration >= self.minimal_iteration_number) and (
             (self.history.n_components[iteration - 100] == self.n_components)
@@ -612,10 +619,7 @@ class SALDEMMD(BaseDEMMD):
 
         mask_locations_points = np.ones(self.n_components, dtype=int)
         for k in range(self.n_components):
-            if (
-                np.sum(np.abs(x_cont - self.means[k]), axis=1) < 1e-14
-            ).any():  ## comme dans mixSAL R
-                # if ((np.linalg.norm(x_cont-saved_means_cluster,ord=2,axis=1)**2)<1e-14).any() : #
+            if (np.sum(np.abs(x_cont - self.means[k]), axis=1) < 1e-14).any():
                 it_last = -1
                 index_before_delete = self.history.index_bf_mask[it_last][
                     k
@@ -623,9 +627,7 @@ class SALDEMMD(BaseDEMMD):
                 saved_means_cluster = self.history.means[it_last][index_before_delete, :]
                 while (np.sum(np.abs(x_cont - saved_means_cluster), axis=1) < 1e-14).any():
                     it_last = it_last - 1
-                    index_before_delete = self.history.index_bf_mask[it_last][
-                        index_before_delete
-                    ]
+                    index_before_delete = self.history.index_bf_mask[it_last][index_before_delete]
                     saved_means_cluster = self.history.means[it_last][index_before_delete]
 
                 self.means[k] = copy.deepcopy(saved_means_cluster)
@@ -640,7 +642,8 @@ class SALDEMMD(BaseDEMMD):
             log_tau[mask_locations_points],
             e1[mask_locations_points],
             e2[mask_locations_points],
-            x_cont)
+            x_cont,
+        )
 
         ##############################
         # Intermediate E-step - multicycle ECM
@@ -652,7 +655,7 @@ class SALDEMMD(BaseDEMMD):
 
         #############################
         # Update covariance matrices
-        cov_reg = self._estimate_params(x_cont, log_tau, e1, e2, cov_comput)
+        cov_reg = self._estimate_cov_matrices(x_cont, log_tau, e1, e2, cov_comput)
         self.covariances = copy.deepcopy(cov_reg)
 
     def fit_predict(self, x, cov_comput="original"):
@@ -690,8 +693,8 @@ class SALDEMMD(BaseDEMMD):
 
         #######################################
         # First iteration - estimation of means
-        self.prev_means = copy.deepcopy(self.means)  
-        self.means = estimate_means(log_tau, e1, e2, x_cont)
+        self.prev_means = copy.deepcopy(self.means)
+        self.means = estimate_locations(log_tau, e1, e2, x_cont)
         while True:
             try:
                 self._m_step(x, log_tau, e1, e2, iteration, cov_comput)
@@ -705,7 +708,15 @@ class SALDEMMD(BaseDEMMD):
                         self.p_discrete,
                         self.n_components,
                     ],
-                    ["proportions", "means", "covariances", "alphas", "beta", "p_discrete", "n_components"],
+                    [
+                        "proportions",
+                        "means",
+                        "covariances",
+                        "alphas",
+                        "beta",
+                        "p_discrete",
+                        "n_components",
+                    ],
                 )
 
             except Exception as e:
@@ -719,7 +730,9 @@ class SALDEMMD(BaseDEMMD):
             try:
                 log_prob_norm, log_tau, e1, e2 = self._e_step(x)
                 ll = log_prob_norm
-                self.history.save_variables([ll, log_tau.argmax(axis=0)], ["log_likelihood", "labels"])
+                self.history.save_variables(
+                    [ll, log_tau.argmax(axis=0)], ["log_likelihood", "labels"]
+                )
             except Exception as e:
                 print("Error in e-step")
                 print(e)
@@ -727,8 +740,8 @@ class SALDEMMD(BaseDEMMD):
 
             #################################
             # Update means - next iteration
-            self.prev_means = copy.deepcopy(self.means) 
-            self.means = estimate_means(log_tau, e1, e2, x_cont)
+            self.prev_means = copy.deepcopy(self.means)
+            self.means = estimate_locations(log_tau, e1, e2, x_cont)
 
             #########################################
             # Check convergence with Aitken criterion
@@ -785,7 +798,6 @@ class SALDEMMD(BaseDEMMD):
 
         return log_tau.argmax(axis=0)
 
-
     def fit(self, x, cov_comput="original"):
         """Estimate SAL mixture model parameters with the DEM-MD algorithm.
 
@@ -801,5 +813,5 @@ class SALDEMMD(BaseDEMMD):
         -------
         self
         """
-        self.fit_predict(x,cov_comput)
+        self.fit_predict(x, cov_comput)
         return self

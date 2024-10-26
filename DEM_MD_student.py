@@ -87,7 +87,6 @@ class StudentDEMMD(BaseDEMMD):
         self.dofs = None
         self.p_discrete = None
 
-
     def _initialize_mixture_parameters(self, x_cont, x_discr):
         """Initialization of the Student mixture parameters.
 
@@ -171,7 +170,7 @@ class StudentDEMMD(BaseDEMMD):
 
         Returns
         -------
-        gamma_u : see Notations.md 
+        gamma_u : see Notations.md
         """
 
         n_samples, n_features = x.shape
@@ -187,7 +186,7 @@ class StudentDEMMD(BaseDEMMD):
 
         return gamma_u
 
-    def _estimate_log_resp(self, x): 
+    def _estimate_log_resp(self, x):
         """
         Estimate log probabilities and responsibilities for each sample.
         Compute the log probabilities, weighted log probabilities per
@@ -198,7 +197,7 @@ class StudentDEMMD(BaseDEMMD):
         Parameters
         ----------
         x : see Notations.md
-            
+
         Returns
         -------
         log_prob : Sum of logarithms of probabilities of each sample in x
@@ -217,7 +216,7 @@ class StudentDEMMD(BaseDEMMD):
         return log_prob_norm, weighted_log_prob - log_prob_norm[np.newaxis, :], gamma_u
 
     def _estimate_params(self, x, log_tau, gamma_u):
-        """Compute estimates of covariance matrix parameters. 
+        """Compute estimates of covariance matrix parameters.
 
         Parameters
         ----------
@@ -268,7 +267,7 @@ class StudentDEMMD(BaseDEMMD):
 
         new_dofs = np.zeros((n_components,))
 
-        # Solve the equation numerically using Brent's method 
+        # Solve the equation numerically using Brent's method
         # for each component of the mixture
         tau = np.exp(log_tau)
         for k in range(n_components):
@@ -332,7 +331,7 @@ class StudentDEMMD(BaseDEMMD):
         -------
         mean(log_prob) : Average of logarithms of probabilities of each sample in data
         log_tau : see Notations.md
-        gamma_u : see Notations
+        gamma_u : see Notations.md
 
         """
 
@@ -369,7 +368,9 @@ class StudentDEMMD(BaseDEMMD):
         proportions = np.zeros((self.n_components,))
         e_value = np.sum(np.multiply(self.prev_pi, np.log(self.prev_pi)))
         for k in range(self.n_components):
-            proportions[k] = proportions_em[k] + self.beta * self.prev_pi[k] * (np.log(self.prev_pi[k]) - e_value)
+            proportions[k] = proportions_em[k] + self.beta * self.prev_pi[k] * (
+                np.log(self.prev_pi[k]) - e_value
+            )
         proportions = proportions / np.sum(proportions)
         self.proportions = copy.deepcopy(proportions)
         ###########################
@@ -377,7 +378,10 @@ class StudentDEMMD(BaseDEMMD):
         ########################
         # Update beta parameter
         eta = np.amin([1.0, 0.5 ** (np.floor(n_features / 2.0 - 1.0))])
-        left = np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_pi))) / self.n_components
+        left = (
+            np.sum(np.exp(-eta * n_samples * np.abs(self.proportions - self.prev_pi)))
+            / self.n_components
+        )
 
         max_proportions_em = np.amax(proportions_em)
         max_pi_old = np.amax(self.prev_pi)
@@ -421,7 +425,7 @@ class StudentDEMMD(BaseDEMMD):
         ###############################################################
 
         ##################################################################################
-        # Check for a pathological solution corresponding to superimposed clusters 
+        # Check for a pathological solution corresponding to superimposed clusters
         # Desactivate the proportions regularisation after a certain number of iterations.
         if (iteration >= self.minimal_iteration_number) and (
             (self.history.n_components[iteration - 100] == self.n_components)
@@ -461,7 +465,7 @@ class StudentDEMMD(BaseDEMMD):
         Parameters
         ----------
         x : array, shape (n_samples, n_features)
-        
+
         Returns
         -------
         labels : array of shape (n_samples)
@@ -473,7 +477,7 @@ class StudentDEMMD(BaseDEMMD):
         # creation of new_index_features with init=True
         x_cont, x_discr = self.transform_data(x, init=True)
         x_cont = np.copy(x_cont, order="F")
-    
+
         #################################################
         # Initialization of parameters and first e-step()
         self._initialize_mixture_parameters(x_cont, x_discr)
@@ -496,7 +500,14 @@ class StudentDEMMD(BaseDEMMD):
                 self._m_step(x, log_tau, gamma_u, iteration)
                 self.prev_means = copy.deepcopy(self.means)
                 self.history.save_variables(
-                    [self.proportions, self.means, self.covariances, self.dofs, self.beta, self.p_discrete],
+                    [
+                        self.proportions,
+                        self.means,
+                        self.covariances,
+                        self.dofs,
+                        self.beta,
+                        self.p_discrete,
+                    ],
                     ["proportions", "means", "covariances", "dofs", "beta", "p_discrete"],
                 )
 
@@ -515,7 +526,7 @@ class StudentDEMMD(BaseDEMMD):
 
             #################################
             # Update means - next iteration
-            self.prev_means = copy.deepcopy(self.means) 
+            self.prev_means = copy.deepcopy(self.means)
             self.means = np.dot((tau * gamma_u), x_cont) / (tau * gamma_u).sum(1)[:, np.newaxis]
 
             #########################################
@@ -548,7 +559,7 @@ class StudentDEMMD(BaseDEMMD):
                     if not patho_clusters:
                         self.converged_ = True
                         break
-                    
+
                     iteration += 1
                 else:
                     iteration += 1
