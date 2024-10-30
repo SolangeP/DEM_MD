@@ -59,7 +59,7 @@ class GaussianDEMMD(BaseDEMMD):
         eps=1e-6,
         gamma=1e-4,
         type_discrete_features=None,
-        index_discrete_features=[np.array([2])],
+        index_discrete_features=None,
         is_dummy=False,
         random_state=None,
     ):
@@ -86,7 +86,7 @@ class GaussianDEMMD(BaseDEMMD):
         self.covariances = None
         self.p_discrete = None
 
-    def _initialize_mixture_parameters(self, x_cont, x_discr):
+    def _initialize_mixture_parameters(self, x_cont, x_discr, tau=None):
         """
         Initialization of the mixture parameters.
         Call a parent method to initialize discrete distribution parameters.

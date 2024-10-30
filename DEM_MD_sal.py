@@ -200,7 +200,7 @@ class SALDEMMD(BaseDEMMD):
         gamma=0.0,
         random_state=None,
         type_discrete_features=None,
-        index_discrete_features=[np.array([2])],
+        index_discrete_features=None,
         is_dummy=False,
         use_temperature=True,
         temp_b=1.0,

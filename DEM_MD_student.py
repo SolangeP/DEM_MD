@@ -58,7 +58,7 @@ class StudentDEMMD(BaseDEMMD):
         eps=1e-6,
         gamma=1e-4,
         type_discrete_features=None,
-        index_discrete_features=[np.array([2])],
+        index_discrete_features=None,
         is_dummy=False,
         random_state=None,
     ):
