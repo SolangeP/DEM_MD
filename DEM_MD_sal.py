@@ -2,6 +2,7 @@ import copy
 import numpy as np
 from scipy.special import logsumexp, kve
 from utils.validation import check_patho_clusters, check_random_state
+from utils.calculation import scheme_temperature
 from base_DEM_MD import BaseDEMMD
 
 
@@ -171,24 +172,6 @@ def estimate_scales(log_tau, e1, e2, locations, alphas, x_cont):
     return scales
 
 
-def scheme_temperature(t, b, rb):
-    """Temperature scheme used for annealing on posterior probabilities during E step of estimation process.
-
-    Parameters
-    ----------
-    t : integer
-        current iteration
-    b : float, scheme parameter
-    rb : float, scheme parameter
-
-    Returns
-    -------
-    float
-        the temperature value applied during E step
-    """
-    return 1.0 + b * np.sin(t / rb) / (t / rb)
-
-
 class SALDEMMD(BaseDEMMD):
     """
     Implementation of DEM-MD for mixture models with SAL continuous distribution.
@@ -299,7 +282,7 @@ class SALDEMMD(BaseDEMMD):
             return estimate_sal_log_proba(
                 x_cont, self.means, self.covariances, self.alphas, self.proportions
             ) + self._estimate_discrete_log_prob(x_discr)
-        # else:
+
         return estimate_sal_log_proba(
             x_cont, self.means, self.covariances, self.alphas, self.proportions
         )
@@ -815,3 +798,23 @@ class SALDEMMD(BaseDEMMD):
         """
         self.fit_predict(x, cov_comput)
         return self
+
+    def _n_parameters(self):
+        """Return the number of free parameters in the model."""
+        _, n_features = self.means.shape
+
+        cov_params = self.n_components * n_features * (n_features + 1) / 2.0
+        mean_params = n_features * self.n_components
+        alphas_params = n_features * self.n_components
+
+        nparams_discrete = 0
+        if self.type_discrete_features is not None:
+            for type_var, p_discrete in zip(self.type_discrete_features, self.p_discrete):
+                if type_var == "Multinomial":
+                    nparams_discrete += self.n_components * (p_discrete.shape[1] - 1)
+                else:
+                    nparams_discrete += self.n_components
+
+        return int(
+            cov_params + mean_params + self.n_components - 1 + alphas_params + nparams_discrete
+        )

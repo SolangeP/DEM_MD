@@ -9,7 +9,7 @@ from utils.calculation import _estimate_student_covariances_full
 from base_DEM_MD import BaseDEMMD
 
 
-def _estimate_student_log_proba(x, locations, scales, dofs, proportions):
+def estimate_student_log_proba(x, locations, scales, dofs, proportions):
     """
     Estimate the log Student pdf.
     Parameters
@@ -30,9 +30,9 @@ def _estimate_student_log_proba(x, locations, scales, dofs, proportions):
     prob = np.empty((n_components, n_samples))
     log_det = np.empty((n_components,))
 
-    for k, (mu, scale) in enumerate(zip(locations, scales)):
+    for k, (mean, scale) in enumerate(zip(locations, scales)):
         precision = np.linalg.inv(scale)
-        xc = x - np.matlib.repmat(mu, n_samples, 1)
+        xc = x - np.tile(mean, (n_samples, 1))
         prob[k, :] = np.sum(np.multiply((xc.dot(precision)), xc), axis=1)
         log_det[k] = np.sum(np.log(np.linalg.eigvalsh(scale)))
 
@@ -152,12 +152,12 @@ class StudentDEMMD(BaseDEMMD):
         x_cont, x_discr = self.transform_data(x)
 
         if self.type_discrete_features is not None:
-            return _estimate_student_log_proba(
+            return estimate_student_log_proba(
                 x_cont, self.means, self.covariances, self.dofs, self.proportions
             ) + self._estimate_discrete_log_prob(x_discr)
 
         else:
-            return _estimate_student_log_proba(
+            return estimate_student_log_proba(
                 x_cont, self.means, self.covariances, self.dofs, self.proportions
             )
 
@@ -177,9 +177,9 @@ class StudentDEMMD(BaseDEMMD):
         n_components, _ = self.means.shape
         gamma_u = np.empty((n_components, n_samples))
 
-        for k, (mu, scale, df) in enumerate(zip(self.means, self.covariances, self.dofs)):
+        for k, (mean, scale, df) in enumerate(zip(self.means, self.covariances, self.dofs)):
             precision = np.linalg.inv(scale)
-            xc = x - np.matlib.repmat(mu, n_samples, 1)
+            xc = x - np.tile(mean, (n_samples, 1))
             gamma_u[k, :] = (df + n_features) / (
                 df + np.sum(np.multiply((xc.dot(precision)), xc), axis=1)
             )
@@ -576,3 +576,23 @@ class StudentDEMMD(BaseDEMMD):
         self.history.save_variables(log_tau.argmax(axis=0), "final_labels")
 
         return log_tau.argmax(axis=0)
+
+    def _n_parameters(self):
+        """Return the number of free parameters in the model."""
+        _, n_features = self.means.shape
+
+        cov_params = self.n_components * n_features * (n_features + 1) / 2.0
+        mean_params = n_features * self.n_components
+        dofs_params = self.n_components
+
+        nparams_discrete = 0
+        if self.type_discrete_features is not None:
+            for type_var, p_discrete in zip(self.type_discrete_features, self.p_discrete):
+                if type_var == "Multinomial":
+                    nparams_discrete += self.n_components * (p_discrete.shape[1] - 1)
+                else:
+                    nparams_discrete += self.n_components
+
+        return int(
+            cov_params + mean_params + dofs_params + self.n_components - 1 + nparams_discrete
+        )

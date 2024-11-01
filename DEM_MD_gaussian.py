@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from numpy.matlib import repmat
+
 from scipy.special import logsumexp
 
 from utils.calculation import _estimate_gaussian_covariances_full
@@ -26,24 +26,29 @@ def estimate_gaussian_log_proba(x, locations, scales, proportions):
     n_samples, n_features = x.shape
     n_components, _ = locations.shape
 
-    log_tau = np.zeros((n_components, n_samples))
+    log_tau = np.zeros(
+        (
+            n_components,
+            n_samples,
+        )
+    )
 
-    for i in range(n_components):
+    for i, (mean, scale, prop) in enumerate(zip(locations, scales, proportions)):
         try:
-            precisions = np.linalg.inv(scales[i])
-            xc = x - repmat(locations[i, :], n_samples, 1)
+            precisions = np.linalg.inv(scale)
+            xc = x - np.tile(mean, (n_samples, 1))
             xc = np.copy(xc, order="F")
             precisions = np.copy(precisions, order="F")
 
             log_tau[i, :] = -0.5 * (
                 np.sum(np.multiply((xc.dot(precisions)), xc), axis=1)
-                + np.sum(np.log(np.linalg.eigvalsh(scales[i])))
+                + np.sum(np.log(np.linalg.eigvalsh(scale)))
                 + n_features * np.log(2 * np.pi)
-            ) + np.log(proportions[i])
+            ) + np.log(prop)
 
         except np.linalg.LinAlgError:
             print("Error with a covariance matrix")
-            print(scales[i])
+            print(scale)
             break
 
     return np.copy(log_tau, order="F")
@@ -400,3 +405,20 @@ class GaussianDEMMD(BaseDEMMD):
         self.history.save_variables(log_tau.argmax(axis=0), "final_labels")
 
         return log_tau.argmax(axis=0)
+
+    def _n_parameters(self):
+        """Return the number of free parameters in the model."""
+        _, n_features = self.means.shape
+
+        cov_params = self.n_components * n_features * (n_features + 1) / 2.0
+        mean_params = n_features * self.n_components
+
+        nparams_discrete = 0
+        if self.type_discrete_features is not None:
+            for type_var, p_discrete in zip(self.type_discrete_features, self.p_discrete):
+                if type_var == "Multinomial":
+                    nparams_discrete += self.n_components * (p_discrete.shape[1] - 1)
+                else:
+                    nparams_discrete += self.n_components
+
+        return int(cov_params + mean_params + self.n_components - 1 + nparams_discrete)
