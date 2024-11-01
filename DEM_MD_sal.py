@@ -729,26 +729,23 @@ class SALDEMMD(BaseDEMMD):
             #########################################
             # Check convergence with Aitken criterion
             if iteration >= 4:
-                loglikelihood_future = self.history.log_likelihood[-1]
-                loglikelihood_actual = self.history.log_likelihood[-2]
-                loglikelihood_prev = self.history.log_likelihood[-3]
-                a_k = (loglikelihood_future - loglikelihood_actual) / (
-                    loglikelihood_actual - loglikelihood_prev
+                small_list_ll = [
+                    self.history.log_likelihood[-i] for i in reversed(range(1, 5))
+                ]  # ordered as [ll[-4],ll[-3],ll[-2],ll[-1]]
+                
+                a_k = (small_list_ll[3] - small_list_ll[2]) / (small_list_ll[2] - small_list_ll[1])
+                loglikelihood_inf = small_list_ll[2] + (small_list_ll[3] - small_list_ll[2]) / (
+                    1.0 - a_k
                 )
-                loglikelihood_inf = loglikelihood_actual + (
-                    loglikelihood_future - loglikelihood_actual
-                ) / (1.0 - a_k)
-                loglikelihood_prev2 = self.history.log_likelihood[-4]
-                a_kprev = (loglikelihood_actual - loglikelihood_prev) / (
-                    loglikelihood_prev - loglikelihood_prev2
+                a_kprev = (small_list_ll[2] - small_list_ll[1]) / (
+                    small_list_ll[1] - small_list_ll[0]
                 )
-                loglikelihood_infprev = loglikelihood_prev + (
-                    loglikelihood_actual - loglikelihood_prev
-                ) / (1.0 - a_kprev)
+                loglikelihood_infprev = small_list_ll[1] + (small_list_ll[2] - small_list_ll[1]) / (
+                    1.0 - a_kprev
+                )
             else:
                 loglikelihood_inf = 10.0
                 loglikelihood_infprev = 50.0
-                loglikelihood_future = -np.inf
 
             if self.n_iter_kconst_ >= 4:
                 if np.abs(loglikelihood_inf - loglikelihood_infprev) < self.eps:  ## Aitken bohning
