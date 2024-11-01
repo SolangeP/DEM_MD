@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 import pandas as pd
 from history import Historic
 from utils.validation import check_random_state
+from utils.calculation import scheme_temperature
 
 
 def _get_attributes_names(cls):
@@ -59,9 +60,40 @@ class BaseMixtureMD(metaclass=ABCMeta):
         self.random_state = random_state
         self.type_discrete_features = type_discrete_features
         self.index_discrete_features = index_discrete_features
+        if type_discrete_features is None and index_discrete_features is None:
+            pass
+        elif type_discrete_features is None or index_discrete_features is None:
+            raise ValueError("Need to define type_discrete_features and index_discrete_features.")
+        else:
+            if len(type_discrete_features) != len(index_discrete_features):
+                raise ValueError(
+                    "type_discrete_features and index_discrete_features have different sizes."
+                )
+            if not all(
+                e
+                in [
+                    "Poisson",
+                    "Bernoulli",
+                    "Multinomial",
+                ]
+                for e in type_discrete_features
+            ):
+                raise ValueError("Discrete distribution not implemented.")
+            flatten_indexes_qual = [
+                indice for arrays in index_discrete_features for indice in arrays
+            ]
+            if not all(
+                [
+                    flatten_indexes_qual[i] == flatten_indexes_qual[i - 1] + 1
+                    for i in range(1, len(flatten_indexes_qual))
+                ]
+            ):
+                raise AssertionError("Qualitative indexes should be all consecutives.")
+
         self.is_dummy = is_dummy
         self.history = Historic()  # Object to save all parameters and estimates
-        self.ll = np.nan
+        self.ll = -np.infty
+        self.n_iter = 0
 
     def _initialize_pdiscrete(self, x_discr, tau):
         """Initialize the parameters of discrete distributions.
@@ -87,6 +119,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
                 p_discrete.append(np.dot(tau, x_discr[:, index]) / nk[:, np.newaxis])
             elif type_var == "Multinomial":
                 p_discrete.append(np.dot(tau, x_discr[:, index]) / nk[:, np.newaxis])
+
         return p_discrete
 
     def _initialize_parameters_em(self, x, random_state):
@@ -119,7 +152,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
 
         else:
             raise ValueError(f"Unimplemented initialization method {self.init_params}")
-        self._initialize_mixture_parameters(x_cont, x_discr)
+        self._initialize_mixture_parameters(x_cont, x_discr, tau.T)
 
     def get_params(self):
         """Returns all attributes of the class, as a dictionnary.
@@ -151,27 +184,27 @@ class BaseMixtureMD(metaclass=ABCMeta):
         x_discr : see Notations.md
             returned if discrete data are present, else an empty list is returned
         """
-        _, n_features = x.shape
+        _, n_features_all = x.shape
 
-        if self.type_discrete_features is not None:
+        x_discr = []
+
+        if self.type_discrete_features:
             flatten_indexes_discrete = [
                 indice for arrays in self.index_discrete_features for indice in arrays
             ]
+
+            assert all(
+                indice < n_features_all for indice in flatten_indexes_discrete
+            ), "At least one qualitative feature index is out of data bounds."
+
             continuous_indexes = [
-                *filterfalse(lambda i: i in flatten_indexes_discrete, [*range(n_features)])
+                *filterfalse(lambda i: i in flatten_indexes_discrete, [*range(n_features_all)])
             ]
-        else:
-            continuous_indexes = [i for i in range(n_features)]
-        
-        x_cont = x[:, continuous_indexes]
-        x_discr = []
-        
-        if self.type_discrete_features is not None:
             if init:
                 n_cont = len(continuous_indexes)
                 self.new_index_discrete_features = [
-                    np.array(self.index_discrete_features[i] - n_cont)
-                    for i in range(0, len(self.index_discrete_features))
+                    self.index_discrete_features[i] - n_cont
+                    for i in range(len(self.index_discrete_features))
                 ]
 
             for j, (type_var, index) in enumerate(
@@ -183,10 +216,14 @@ class BaseMixtureMD(metaclass=ABCMeta):
                     dummy_multi = np.array(pd.get_dummies(x[:, index].reshape(-1)))
                     number_mod = dummy_multi.shape[1]
                     if init:
-                        self.new_index_discrete_features[j] = np.arange(
-                            self.new_index_discrete_features[j],self.new_index_discrete_features[j] + number_mod)
+                        self.new_index_discrete_features[j] = np.array(
+                            np.arange(
+                                self.new_index_discrete_features[j][0],
+                                self.new_index_discrete_features[j][0] + number_mod,
+                            )
+                        )
                         self.new_index_discrete_features[j + 1 :] = [
-                            np.array(self.new_index_discrete_features[i] + number_mod - 1)
+                            self.new_index_discrete_features[i] + number_mod - 1
                             for i in range(j + 1, len(self.index_discrete_features))
                         ]
                     x_discr.extend(dummy_multi.T)
@@ -196,19 +233,21 @@ class BaseMixtureMD(metaclass=ABCMeta):
                     x_discr.extend(dummy_multi.T)
 
             x_discr = np.array(x_discr).T
-            return x_cont, x_discr
         else:
-            return x_cont, x_discr
+            continuous_indexes = [i for i in range(n_features_all)]
+
+        x_cont = x[:, continuous_indexes]
+        return x_cont, x_discr
 
     @abstractmethod
-    def _initialize_mixture_parameters(
-        self, x_cont, x_discr
-    ):  
+    def _initialize_mixture_parameters(self, x_cont, x_discr, tau):
         """Initialize the model parameters of the derived class.
 
         Parameters
         ----------
-        x : see Notations.md
+        x_cont : see Notations.md
+        x_discr: see Notations.md
+        tau: see Notations.md
         """
 
     def fit(self, x):
@@ -217,14 +256,13 @@ class BaseMixtureMD(metaclass=ABCMeta):
         Parameters
         ----------
         x : see Notations.md
-        
+
         Returns
         -------
         self
         """
         self.fit_predict(x)
         return self
-
 
     @abstractmethod
     def _estimate_weighted_log_prob(self, x):
@@ -235,12 +273,6 @@ class BaseMixtureMD(metaclass=ABCMeta):
             x : see Notations.md
         """
 
-        pass
-
-    @abstractmethod
-    def _estimate_params(self, x, log_tau):
-        pass
-    
     @abstractmethod
     def _m_step(self, x, log_tau, iteration):
         """Abstract method for M-step.
@@ -290,7 +322,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
 
         Returns
         -------
-        weighted_log_prob : array-like, shape (n_components, n_samples)
+        log_tau : array-like, shape (n_components, n_samples)
 
         """
 
@@ -322,7 +354,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
                             pass
                         else:
                             log_tau[k, :] += (
-                                - self.p_discrete[j][k]
+                                -self.p_discrete[j][k]
                                 + np.log(self.p_discrete[j][k]) * (x_discr[:, index_val])
                                 - np.log(factorial(x_discr[:, index_val]))
                             )
@@ -332,7 +364,9 @@ class BaseMixtureMD(metaclass=ABCMeta):
                         ).any() or (np.isclose(self.p_discrete[j][k], 0.0, atol=0.0).any()):
                             pass
                         else:
-                            log_tau[k, :] += np.dot(x_discr[:, index], np.log(self.p_discrete[j][k]))
+                            log_tau[k, :] += np.dot(
+                                x_discr[:, index], np.log(self.p_discrete[j][k])
+                            )
 
                 except np.linalg.LinAlgError:
                     print("In estimate_discrete_log_prob:")
@@ -418,39 +452,38 @@ class BaseMixtureMD(metaclass=ABCMeta):
 
             ll = log_prob_norm
 
-            self.history.save_variables([ll,log_tau.argmax(axis=0)], ["log_likelihood","labels"])
+            self.history.save_variables([ll, log_tau.argmax(axis=0)], ["log_likelihood", "labels"])
 
             ######################################
             # Stopping criterion: Aitken's acceleration
             ######################################
             if iteration >= 4:
-                loglikelihood_future = self.history.log_likelihood[-1]
-                loglikelihood_actual = self.history.log_likelihood[-2]
-                loglikelihood_prev = self.history.log_likelihood[-3]
-                loglikelihood_prev2 = self.history.log_likelihood[-4]
 
-                if (loglikelihood_actual - loglikelihood_prev) == 0.0:
+                small_list_ll = [
+                    self.history.log_likelihood[-i] for i in reversed(range(1, 5))
+                ]  # ordered as [ll[-4],ll[-3],ll[-2],ll[-1]]
+
+                if (small_list_ll[2] - small_list_ll[1]) == 0.0:
                     a_k = 0.0
                 else:
-                    a_k = (loglikelihood_future - loglikelihood_actual) / (
-                        loglikelihood_actual - loglikelihood_prev
+                    a_k = (small_list_ll[3] - small_list_ll[2]) / (
+                        small_list_ll[2] - small_list_ll[1]
                     )
-                loglikelihood_inf = loglikelihood_actual + (
-                    loglikelihood_future - loglikelihood_actual
-                ) / (1.0 - a_k)
-                if (loglikelihood_prev - loglikelihood_prev2) == 0.0:
+                loglikelihood_inf = small_list_ll[2] + (small_list_ll[3] - small_list_ll[2]) / (
+                    1.0 - a_k
+                )
+                if (small_list_ll[1] - small_list_ll[0]) == 0.0:
                     a_kprev = 0.0
                 else:
-                    a_kprev = (loglikelihood_actual - loglikelihood_prev) / (
-                        loglikelihood_prev - loglikelihood_prev2
+                    a_kprev = (small_list_ll[2] - small_list_ll[1]) / (
+                        small_list_ll[1] - small_list_ll[0]
                     )
-                loglikelihood_infprev = loglikelihood_prev + (
-                    loglikelihood_actual - loglikelihood_prev
-                ) / (1.0 - a_kprev)
+                loglikelihood_infprev = small_list_ll[1] + (small_list_ll[2] - small_list_ll[1]) / (
+                    1.0 - a_kprev
+                )
             else:
                 loglikelihood_inf = 10.0
                 loglikelihood_infprev = 50.0
-                loglikelihood_future = -np.inf
 
             if np.abs(loglikelihood_inf - loglikelihood_infprev) < self.eps:
                 self.converged_ = True
@@ -467,7 +500,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
         self.n_iter = iteration
         self.ll = ll
 
-        # Always do a final e-step to guarantee that 
+        # Always do a final e-step to guarantee that
         # the labels returned by fit_predict(x)
         #  are always consistent with fit(x).predict(x)
         _, log_tau = self._e_step(x)
@@ -479,7 +512,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
         Parameters
         ----------
         x : see Notations.md
-        
+
         Returns
         -------
         log_prob : array, shape (n_samples,)
@@ -513,7 +546,14 @@ class BaseMixtureMD(metaclass=ABCMeta):
         """
         if not hasattr(self, "n_iter"):
             raise ValueError("Model was not fitted")
-        weighted_log_prob = self._estimate_weighted_log_prob(x)
+
+        if hasattr(self, "use_temp") and self.use_temp:
+            self.temperature = scheme_temperature(
+                self.iteration_temp, b=self.temp_b, rb=self.temp_rb
+            )
+            weighted_log_prob = self._estimate_weighted_log_prob(x) * (1.0 / self.temperature)
+        else:
+            weighted_log_prob = self._estimate_weighted_log_prob(x)
         normalized_weighted = (
             weighted_log_prob - logsumexp(weighted_log_prob, axis=0)[np.newaxis, :]
         )
@@ -598,7 +638,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
         return self.bic(x) + mean_entropy
 
     def nec(self, x, l1):
-        """Negative Entropy critetion for the current model on the input x.
+        """Negative Entropy criterion for the current model on the input x.
 
         Parameters
         ----------
