@@ -9,6 +9,7 @@
 - `locations` is the array of locations (centers, means for Gaussian or Student distribution for example) parameters. Shape `(n_components,n_features_cont)`
 - `scales` is the array of scale matrices (covariances). Shape `(n_components, n_features_cont,n_features_cont)`
 - `proportions` is the vector with mixture proportions, which are weights of each distribution in the mixture. Shape `(n_components,)` 
+- `p_discrete` is the list of size `n_features_discr` with parameters for each discrete distribution. Each element in `p_discrete` is an array of shape `(n_components, n_modalities)` for Multinomial distribution, `(n_components, 1)` for Poisson or Bernoulli distributions.
 
 ## Variables per distribution
 ### Student mixture model
