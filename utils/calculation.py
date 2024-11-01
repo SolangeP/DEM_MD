@@ -69,6 +69,25 @@ def _estimate_student_covariances_full(tau, gamma_u, x, means, reg_covar):
     return covariances
 
 
+############# Method for temperature schema in Shifted Asymmetric Laplace Mixture Models
+def scheme_temperature(t, b, rb):
+    """Temperature scheme used for annealing on posterior probabilities during E step of estimation process.
+
+    Parameters
+    ----------
+    t : integer
+        current iteration
+    b : float, scheme parameter
+    rb : float, scheme parameter
+
+    Returns
+    -------
+    float
+        the temperature value applied during E step
+    """
+    return 1.0 + b * np.sin(t / rb) / (t / rb)
+
+
 ############# Methods for permutations and errors on parameters
 
 
