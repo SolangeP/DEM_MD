@@ -6,7 +6,7 @@ from scipy.special import gammaln, digamma, logsumexp
 
 from .utils.validation import check_patho_clusters
 from .utils.calculation import _estimate_student_covariances_full
-from base_DEM_MD import BaseDEMMD
+from .base_DEM_MD import BaseDEMMD
 
 
 def estimate_student_log_proba(x, locations, scales, dofs, proportions):

@@ -3,7 +3,7 @@ import numpy as np
 from scipy.special import logsumexp, kve
 from .utils.validation import check_patho_clusters, check_random_state
 from .utils.calculation import scheme_temperature
-from base_DEM_MD import BaseDEMMD
+from .base_DEM_MD import BaseDEMMD
 
 
 def estimate_sal_log_proba(x, locations, scales, alphas, proportions):
