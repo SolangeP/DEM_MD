@@ -3,9 +3,9 @@ import numpy as np
 
 from scipy.special import logsumexp
 
-from utils.calculation import _estimate_gaussian_covariances_full
-from utils.validation import check_patho_clusters
-from base_DEM_MD import BaseDEMMD
+from .utils.calculation import _estimate_gaussian_covariances_full
+from .utils.validation import check_patho_clusters
+from .base_DEM_MD import BaseDEMMD
 
 
 def estimate_gaussian_log_proba(x, locations, scales, proportions):

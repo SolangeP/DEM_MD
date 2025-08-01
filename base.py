@@ -1,4 +1,4 @@
-"""Base class for mixture models  """
+"""Base class for mixture models"""
 
 from abc import ABCMeta, abstractmethod
 from sklearn.cluster import KMeans
@@ -15,18 +15,16 @@ from utils.validation import check_random_state
 
 
 def _get_attributes_names(cls):
-    """    Get parameter names for the estimator
+    """Get parameter names for the estimator
 
     Returns
     -------
-    list        
+    list
         sorted names of class attributes
     """
 
     attributes = inspect.getmembers(cls, lambda a: not (inspect.isroutine(a)))
-    filtered_attrib = [
-        a for a in attributes if not (a[0].startswith("_") and a[0].endswith("__"))
-    ]
+    filtered_attrib = [a for a in attributes if not (a[0].startswith("_") and a[0].endswith("__"))]
 
     # introspect the constructor arguments to find the model parameters
     # to represent
@@ -43,9 +41,7 @@ class BaseMixture(metaclass=ABCMeta):
     provides basic common methods for mixture models.
     """
 
-    def __init__(
-        self, n_components, eps, reg_cov, maxiter, init_params, warm_start, random_state
-    ):
+    def __init__(self, n_components, eps, reg_cov, maxiter, init_params, warm_start, random_state):
         self.n_components = n_components
         self.eps = eps
         self.maxiter = maxiter
@@ -69,9 +65,7 @@ class BaseMixture(metaclass=ABCMeta):
         if self.init_params == "kmeans":
             tau = np.zeros((n_samples, self.n_components))
             label = (
-                KMeans(
-                    n_clusters=self.n_components, n_init=1, random_state=random_state
-                )
+                KMeans(n_clusters=self.n_components, n_init=1, random_state=random_state)
                 .fit(x)
                 .labels_
             )
@@ -93,9 +87,7 @@ class BaseMixture(metaclass=ABCMeta):
                     tau = np.exp(gm._estimate_log_prob_resp(x)[1])
                     highest_ll = gm_score
         else:
-            raise ValueError(
-                "Unimplemented initialization method {}".format(self.init_params)
-            )
+            raise ValueError("Unimplemented initialization method {}".format(self.init_params))
 
         self._initialize(x, tau.T)
 
@@ -213,7 +205,6 @@ class BaseMixture(metaclass=ABCMeta):
 
         return log_prob_norm, weighted_log_prob - log_prob_norm[np.newaxis, :]
 
-
     def fit_predict(self, x):
         n_samples, n_features = x.shape
         self.n_features = n_features
@@ -227,7 +218,7 @@ class BaseMixture(metaclass=ABCMeta):
         else:
             print("Warm start so no initialisation")
 
-        LL = -np.infty if do_init else self.LL
+        LL = -np.inf if do_init else self.LL
 
         for iteration in range(1, self.maxiter + 1):
             prev_LL = LL
@@ -339,7 +330,7 @@ class BaseMixture(metaclass=ABCMeta):
         return dico
 
     def _check_patho_clusters(self):
-        """ Check if there are pathological clusters,
+        """Check if there are pathological clusters,
         which means : same centroids and same covariances
 
         Returns
@@ -354,12 +345,8 @@ class BaseMixture(metaclass=ABCMeta):
 
         for i in range(self.n_components):
             for j in range(i, self.n_components):
-                dist_cov[i, j] = np.linalg.norm(
-                    (self.covariances[i] - self.covariances[j])
-                )
-                dist_cov[j, i] = np.linalg.norm(
-                    (self.covariances[j] - self.covariances[i])
-                )
+                dist_cov[i, j] = np.linalg.norm((self.covariances[i] - self.covariances[j]))
+                dist_cov[j, i] = np.linalg.norm((self.covariances[j] - self.covariances[i]))
 
         dist_totale = dist_cov + dist_centroids
         index_null = np.argwhere(dist_totale == 0)

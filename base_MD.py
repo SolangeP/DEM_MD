@@ -9,9 +9,9 @@ import numpy as np
 from scipy.special import logsumexp, factorial
 from sklearn.cluster import KMeans
 import pandas as pd
-from history import Historic
-from utils.validation import check_random_state
-from utils.calculation import scheme_temperature
+from .history import Historic
+from .utils.validation import check_random_state
+from .utils.calculation import scheme_temperature
 
 
 def _get_attributes_names(cls):
@@ -92,7 +92,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
 
         self.is_dummy = is_dummy
         self.history = Historic()  # Object to save all parameters and estimates
-        self.ll = -np.infty
+        self.ll = -np.inf
         self.n_iter = 0
 
     def _initialize_pdiscrete(self, x_discr, tau):
@@ -444,7 +444,7 @@ class BaseMixtureMD(metaclass=ABCMeta):
         else:
             print("Warm start so no initialisation")
 
-        ll = -np.infty if do_init else self.ll
+        ll = -np.inf if do_init else self.ll
 
         for iteration in range(1, self.maxiter + 1):
             log_prob_norm, log_tau = self._e_step(x)

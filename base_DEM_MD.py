@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial.distance import cdist, pdist
 from scipy.special import logsumexp
 from sklearn.metrics import pairwise_distances_chunked
-from base_MD import BaseMixtureMD
+from .base_MD import BaseMixtureMD
 
 
 class BaseDEMMD(BaseMixtureMD):
@@ -89,7 +89,7 @@ class BaseDEMMD(BaseMixtureMD):
             # Speed up by computing on chunks of samples
             gen = pairwise_distances_chunked(x, n_jobs=-1)
             len_total = 0
-            self.min_dist = np.infty
+            self.min_dist = np.inf
             for mat in gen:
                 actual_amin = np.amin(mat[mat > 0.0])
                 if actual_amin < self.min_dist:
