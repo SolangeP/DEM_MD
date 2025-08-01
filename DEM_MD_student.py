@@ -4,8 +4,8 @@ from scipy.optimize import brentq
 from scipy.special import gammaln, digamma, logsumexp
 
 
-from utils.validation import check_patho_clusters
-from utils.calculation import _estimate_student_covariances_full
+from .utils.validation import check_patho_clusters
+from .utils.calculation import _estimate_student_covariances_full
 from base_DEM_MD import BaseDEMMD
 
 

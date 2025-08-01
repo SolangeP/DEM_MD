@@ -1,8 +1,8 @@
 import copy
 import numpy as np
 from scipy.special import logsumexp, kve
-from utils.validation import check_patho_clusters, check_random_state
-from utils.calculation import scheme_temperature
+from .utils.validation import check_patho_clusters, check_random_state
+from .utils.calculation import scheme_temperature
 from base_DEM_MD import BaseDEMMD
 
 
@@ -732,7 +732,7 @@ class SALDEMMD(BaseDEMMD):
                 small_list_ll = [
                     self.history.log_likelihood[-i] for i in reversed(range(1, 5))
                 ]  # ordered as [ll[-4],ll[-3],ll[-2],ll[-1]]
-                
+
                 a_k = (small_list_ll[3] - small_list_ll[2]) / (small_list_ll[2] - small_list_ll[1])
                 loglikelihood_inf = small_list_ll[2] + (small_list_ll[3] - small_list_ll[2]) / (
                     1.0 - a_k
