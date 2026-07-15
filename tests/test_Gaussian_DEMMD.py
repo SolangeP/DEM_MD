@@ -1,5 +1,3 @@
-import os
-import sys
 import pytest
 from scipy import stats
 
@@ -7,11 +5,10 @@ import random
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
-sys.path.append("../")
-from utils.sampling import simulation_mixed_data
+from dem_md.utils.sampling import simulation_mixed_data
+from dem_md.DEM_MD_gaussian import GaussianDEMMD, estimate_gaussian_log_proba
 
-from DEM_MD_gaussian import GaussianDEMMD, estimate_gaussian_log_proba
-from base_DEM_MD import BaseDEMMD
+# from dem_md.base_DEM_MD import BaseDEMMD
 
 
 class TestClassGaussianDEMMD:

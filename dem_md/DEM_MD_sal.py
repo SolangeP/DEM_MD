@@ -314,7 +314,7 @@ class SALDEMMD(BaseDEMMD):
             alph_mat = alph.reshape(-1, 1)
             precision = np.linalg.inv(scale)
             xc = x - mu
-            a[k] = 2 + (alph_mat.T.dot(precision)).dot(alph_mat)
+            a[k] = 2 + (alph_mat.T.dot(precision)).dot(alph_mat).item()
             b[k, :] = np.sum(np.multiply((xc.dot(precision)), xc), axis=1)
 
             log_b = np.log(b[k, :])

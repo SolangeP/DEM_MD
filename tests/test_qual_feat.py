@@ -1,5 +1,3 @@
-import os
-import sys
 import pytest
 
 # Fix random seed
@@ -8,9 +6,8 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 from scipy import stats
 
-sys.path.append("../")
-from utils.sampling import simulation_mixed_data
-from base_DEM_MD import BaseDEMMD
+from dem_md.utils.sampling import simulation_mixed_data
+from dem_md.base_DEM_MD import BaseDEMMD
 from pandas import get_dummies
 
 

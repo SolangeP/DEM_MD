@@ -1,5 +1,3 @@
-import os
-import sys
 import pytest
 from scipy import stats
 
@@ -7,10 +5,9 @@ import random
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
-sys.path.append("../")
-from utils.sampling import simulation_mixed_data
-from DEM_MD_sal import SALDEMMD, estimate_sal_log_proba
-from base_DEM_MD import BaseDEMMD
+from dem_md.utils.sampling import simulation_mixed_data
+from dem_md.DEM_MD_sal import SALDEMMD, estimate_sal_log_proba
+from dem_md.base_DEM_MD import BaseDEMMD
 
 
 class TestClassSALDEMMD:
@@ -45,7 +42,7 @@ class TestClassSALDEMMD:
     )
 
     def test_sal_mixture_attributes(self):
-        from utils.validation import check_random_state
+        from dem_md.utils.validation import check_random_state
 
         n_samples, n_features_all = self.data.shape
 
